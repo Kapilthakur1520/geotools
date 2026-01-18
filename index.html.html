@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional IAC & UTM Grid System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <style>
+        :root {
+            --primary-dark: #2c3e50;
+            --accent-orange: #d35400;
+            --glass-bg: rgba(255, 255, 255, 0.94);
+            --shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; left: 0; right: 0; background-color: #f4f4f4; }
+        
+        .ui-panel {
+            position: absolute;
+            z-index: 1000;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(0,0,0,0.08);
+            padding: 12px;
+        }
+
+        /* Find Tool: Fixed at Bottom-Left */
+        .search-container { 
+            bottom: 20px; 
+            left: 20px; 
+            display: flex; 
+            gap: 10px; 
+            width: 300px; 
+        }
+        #search { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; outline: none; font-size: 0.9rem; }
+        
+        /* Analysis & Layer Tools: Top-Right */
+        .control-panel { 
+            top: 20px; 
+            right: 20px; 
+            width: 180px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+        }
+        .section-title { font-size: 0.65rem; font-weight: 800; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        
+        .btn-main {
+            background: var(--primary-dark);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .btn-main:hover { background: #1a252f; }
+
+        /* Adjusted Font Size for Analysis Tools */
+        .btn-tool {
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 8px 4px;
+            border-radius: 8px;
+            font-size: 0.7rem; /* Reduced for better visibility */
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: 0.2s;
+        }
+        .btn-tool:hover { background: #fcfcfc; border-color: #bbb; }
+        
+        .draw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        /* Real-time Status Bar: Bottom-Right */
+        .status-bar {
+            bottom: 20px;
+            right: 20px;
+            min-width: 320px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .status-bar b { color: var(--accent-orange); }
+        .status-item { display: flex; justify-content: space-between; }
+
+        /* Map Labels */
+        .grid-label {
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(0,0,0,0.15);
+            padding: 2px 6px;
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 4px;
+            color: #222;
+            pointer-events: none;
+        }
+
+        .iac-popup-header {
+            background: var(--accent-orange);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="ui-panel search-container">
+        <input type="text" id="search" placeholder="Search location or Lat, Lon...">
+        <button id="search-btn" class="btn-main">Find</button>
+    </div>
+
+    <div class="ui-panel control-panel">
+        <div>
+            <div class="section-title">Base Layer</div>
+            <select id="tile-selector" style="width:100%; padding:8px; border-radius:8px; border:1px solid #ddd; cursor:pointer; font-size: 0.8rem;">
+                <option value="carto-light">Light (Topographic)</option>
+                <option value="osm">Standard (OSM)</option>
+                <option value="carto-dark">Satellite Focus (Dark)</option>
+            </select>
+        </div>
+        
+        <div>
+            <div class="section-title">Analysis Tools</div>
+            <div class="draw-grid">
+                <button onclick="activateTool('point')" class="btn-tool">📍 Pt</button>
+                <button onclick="activateTool('rectangle')" class="btn-tool">⬛ Rect</button>
+                <button onclick="activateTool('polygon')" class="btn-tool">⬢ Poly</button>
+                <button id="clear-drawings" class="btn-tool">🗑️ Clr</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-panel status-bar">
+        <div class="status-item">IAC Sheet: <b id="sheet-val">---</b></div>
+        <div class="status-item">UTM Zone: <b id="utm-val">---</b></div>
+        <div class="status-item">Lat/Lon: <b id="pos-val">0.0, 0.0</b></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script>
+        const zones = [{ zone: 1, lat_from: 36, lat_to: 40, long_from: 44, long_to: 48 }, { zone: 2, lat_from: 32, lat_to: 36, long_from: 44, long_to: 48 }, { zone: 3, lat_from: 28, lat_to: 32, long_from: 44, long_to: 48 }, { zone: 4, lat_from: 24, lat_to: 28, long_from: 44, long_to: 48 }, { zone: 5, lat_from: 20, lat_to: 24, long_from: 44, long_to: 48 }, { zone: 6, lat_from: 16, lat_to: 20, long_from: 44, long_to: 48 }, { zone: 7, lat_from: 12, lat_to: 16, long_from: 44, long_to: 48 }, { zone: 8, lat_from: 36, lat_to: 40, long_from: 48, long_to: 52 }, { zone: 9, lat_from: 32, lat_to: 36, long_from: 48, long_to: 52 }, { zone: 10, lat_from: 28, lat_to: 32, long_from: 48, long_to: 52 }, { zone: 11, lat_from: 24, lat_to: 28, long_from: 48, long_to: 52 }, { zone: 12, lat_from: 20, lat_to: 24, long_from: 48, long_to: 52 }, { zone: 13, lat_from: 16, lat_to: 20, long_from: 48, long_to: 52 }, { zone: 14, lat_from: 12, lat_to: 16, long_from: 48, long_to: 52 }, { zone: 15, lat_from: 36, lat_to: 40, long_from: 52, long_to: 56 }, { zone: 16, lat_from: 32, lat_to: 36, long_from: 52, long_to: 56 }, { zone: 17, lat_from: 28, lat_to: 32, long_from: 52, long_to: 56 }, { zone: 18, lat_from: 24, lat_to: 28, long_from: 52, long_to: 56 }, { zone: 19, lat_from: 20, lat_to: 24, long_from: 52, long_to: 56 }, { zone: 20, lat_from: 16, lat_to: 20, long_from: 52, long_to: 56 }, { zone: 21, lat_from: 12, lat_to: 16, long_from: 52, long_to: 56 }, { zone: 22, lat_from: 36, lat_to: 40, long_from: 56, long_to: 60 }, { zone: 23, lat_from: 32, lat_to: 36, long_from: 56, long_to: 60 }, { zone: 24, lat_from: 28, lat_to: 32, long_from: 56, long_to: 60 }, { zone: 25, lat_from: 24, lat_to: 28, long_from: 56, long_to: 60 }, { zone: 26, lat_from: 20, lat_to: 24, long_from: 56, long_to: 60 }, { zone: 27, lat_from: 16, lat_to: 20, long_from: 56, long_to: 60 }, { zone: 28, lat_from: 36, lat_to: 40, long_from: 60, long_to: 64 }, { zone: 29, lat_from: 32, lat_to: 36, long_from: 60, long_to: 64 }, { zone: 30, lat_from: 28, lat_to: 32, long_from: 60, long_to: 64 }, { zone: 31, lat_from: 24, lat_to: 28, long_from: 60, long_to: 64 }, { zone: 32, lat_from: 36, lat_to: 40, long_from: 64, long_to: 68 }, { zone: 33, lat_from: 32, lat_to: 36, long_from: 64, long_to: 68 }, { zone: 34, lat_from: 28, lat_to: 32, long_from: 64, long_to: 68 }, { zone: 35, lat_from: 24, lat_to: 28, long_from: 64, long_to: 68 }, { zone: 36, lat_from: 20, lat_to: 24, long_from: 64, long_to: 68 }, { zone: 37, lat_from: 36, lat_to: 40, long_from: 68, long_to: 72 }, { zone: 38, lat_from: 32, lat_to: 36, long_from: 68, long_to: 72 }, { zone: 39, lat_from: 28, lat_to: 32, long_from: 68, long_to: 72 }, { zone: 40, lat_from: 24, lat_to: 28, long_from: 68, long_to: 72 }, { zone: 41, lat_from: 20, lat_to: 24, long_from: 68, long_to: 72 }, { zone: 42, lat_from: 36, lat_to: 40, long_from: 72, long_to: 76 }, { zone: 43, lat_from: 32, lat_to: 36, long_from: 72, long_to: 76 }, { zone: 44, lat_from: 28, lat_to: 32, long_from: 72, long_to: 76 }, { zone: 45, lat_from: 24, lat_to: 28, long_from: 72, long_to: 76 }, { zone: 46, lat_from: 20, lat_to: 24, long_from: 72, long_to: 76 }, { zone: 47, lat_from: 16, lat_to: 20, long_from: 72, long_to: 76 }, { zone: 48, lat_from: 12, lat_to: 16, long_from: 72, long_to: 76 }, { zone: 49, lat_from: 8, lat_to: 12, long_from: 72, long_to: 76 }, { zone: 50, lat_from: 4, lat_to: 8, long_from: 72, long_to: 76 }, { zone: 51, lat_from: 36, lat_to: 40, long_from: 76, long_to: 80 }, { zone: 52, lat_from: 32, lat_to: 36, long_from: 76, long_to: 80 }, { zone: 53, lat_from: 28, lat_to: 32, long_from: 76, long_to: 80 }, { zone: 54, lat_from: 24, lat_to: 28, long_from: 76, long_to: 80 }, { zone: 55, lat_from: 20, lat_to: 24, long_from: 76, long_to: 80 }, { zone: 56, lat_from: 16, lat_to: 20, long_from: 76, long_to: 80 }, { zone: 57, lat_from: 12, lat_to: 16, long_from: 76, long_to: 80 }, { zone: 58, lat_from: 8, lat_to: 12, long_from: 76, long_to: 80 }, { zone: 59, lat_from: 4, lat_to: 8, long_from: 76, long_to: 80 }, { zone: 60, lat_from: 36, lat_to: 40, long_from: 80, long_to: 84 }, { zone: 61, lat_from: 32, lat_to: 36, long_from: 80, long_to: 84 }, { zone: 62, lat_from: 28, lat_to: 32, long_from: 80, long_to: 84 }, { zone: 63, lat_from: 24, lat_to: 28, long_from: 80, long_to: 84 }, { zone: 64, lat_from: 20, lat_to: 24, long_from: 80, long_to: 84 }, { zone: 65, lat_from: 16, lat_to: 20, long_from: 80, long_to: 84 }, { zone: 66, lat_from: 12, lat_to: 16, long_from: 80, long_to: 84 }, { zone: 67, lat_from: 8, lat_to: 12, long_from: 80, long_to: 84 }, { zone: 68, lat_from: 4, lat_to: 8, long_from: 80, long_to: 84 }, { zone: 69, lat_from: 36, lat_to: 40, long_from: 84, long_to: 88 }, { zone: 70, lat_from: 32, lat_to: 36, long_from: 84, long_to: 88 }, { zone: 71, lat_from: 28, lat_to: 32, long_from: 84, long_to: 88 }, { zone: 72, lat_from: 24, lat_to: 28, long_from: 84, long_to: 88 }, { zone: 73, lat_from: 20, lat_to: 24, long_from: 84, long_to: 88 }, { zone: 74, lat_from: 16, lat_to: 20, long_from: 84, long_to: 88 }, { zone: 75, lat_from: 36, lat_to: 40, long_from: 88, long_to: 92 }, { zone: 76, lat_from: 32, lat_to: 36, long_from: 88, long_to: 92 }, { zone: 77, lat_from: 28, lat_to: 32, long_from: 88, long_to: 92 }, { zone: 78, lat_from: 24, lat_to: 28, long_from: 88, long_to: 92 }, { zone: 79, lat_from: 20, lat_to: 24, long_from: 88, long_to: 92 }, { zone: 80, lat_from: 36, lat_to: 40, long_from: 92, long_to: 96 }, { zone: 81, lat_from: 32, lat_to: 36, long_from: 92, long_to: 96 }, { zone: 82, lat_from: 28, lat_to: 32, long_from: 92, long_to: 96 }, { zone: 83, lat_from: 24, lat_to: 28, long_from: 92, long_to: 96 }, { zone: 84, lat_from: 20, lat_to: 24, long_from: 92, long_to: 96 }, { zone: 85, lat_from: 16, lat_to: 20, long_from: 92, long_to: 96 }, { zone: 86, lat_from: 12, lat_to: 16, long_from: 92, long_to: 96 }, { zone: 87, lat_from: 8, lat_to: 12, long_from: 92, long_to: 96 }, { zone: 88, lat_from: 4, lat_to: 8, long_from: 92, long_to: 96 }, { zone: 89, lat_from: 36, lat_to: 40, long_from: 96, long_to: 100 }, { zone: 90, lat_from: 32, lat_to: 36, long_from: 96, long_to: 100 }, { zone: 91, lat_from: 28, lat_to: 32, long_from: 96, long_to: 100 }, { zone: 92, lat_from: 24, lat_to: 28, long_from: 96, long_to: 100 }, { zone: 93, lat_from: 20, lat_to: 24, long_from: 96, long_to: 100 }, { zone: 94, lat_from: 16, lat_to: 20, long_from: 96, long_to: 100 }, { zone: 95, lat_from: 12, lat_to: 16, long_from: 96, long_to: 100 }, { zone: 96, lat_from: 8, lat_to: 12, long_from: 96, long_to: 100 }, { zone: 97, lat_from: 4, lat_to: 8, long_from: 96, long_to: 100 }, { zone: 98, lat_from: 36, lat_to: 40, long_from: 100, long_to: 104 }, { zone: 99, lat_from: 32, lat_to: 36, long_from: 100, long_to: 104 }, { zone: 100, lat_from: 28, lat_to: 32, long_from: 100, long_to: 104 }, { zone: 101, lat_from: 24, lat_to: 28, long_from: 100, long_to: 104 }, { zone: 102, lat_from: 20, lat_to: 24, long_from: 100, long_to: 104 }, { zone: 103, lat_from: 16, lat_to: 20, long_from: 100, long_to: 104 }, { zone: 104, lat_from: 12, lat_to: 16, long_from: 100, long_to: 104 }, { zone: 105, lat_from: 8, lat_to: 12, long_from: 100, long_to: 104 }, { zone: 106, lat_from: 4, lat_to: 8, long_from: 100, long_to: 104 }, { zone: 107, lat_from: 36, lat_to: 40, long_from: 104, long_to: 108 }, { zone: 108, lat_from: 32, lat_to: 36, long_from: 104, long_to: 108 }, { zone: 109, lat_from: 28, lat_to: 32, long_from: 104, long_to: 108 }, { zone: 110, lat_from: 24, lat_to: 28, long_from: 104, long_to: 108 }, { zone: 111, lat_from: 20, lat_to: 24, long_from: 104, long_to: 108 }, { zone: 112, lat_from: 16, lat_to: 20, long_from: 104, long_to: 108 }, { zone: 113, lat_from: 12, lat_to: 16, long_from: 104, long_to: 108 }, { zone: 114, lat_from: 8, lat_to: 12, long_from: 104, long_to: 108 }, { zone: 115, lat_from: 36, lat_to: 40, long_from: 108, long_to: 112 }, { zone: 116, lat_from: 32, lat_to: 36, long_from: 108, long_to: 112 }, { zone: 117, lat_from: 28, lat_to: 32, long_from: 108, long_to: 112 }, { zone: 118, lat_from: 24, lat_to: 28, long_from: 108, long_to: 112 }, { zone: 119, lat_from: 20, lat_to: 24, long_from: 108, long_to: 112 }, { zone: 120, lat_from: 16, lat_to: 20, long_from: 108, long_to: 112 }, { zone: 121, lat_from: 12, lat_to: 16, long_from: 108, long_to: 112 }, { zone: 122, lat_from: 8, lat_to: 12, long_from: 108, long_to: 112 }, { zone: 123, lat_from: 36, lat_to: 40, long_from: 112, long_to: 116 }, { zone: 124, lat_from: 32, lat_to: 36, long_from: 112, long_to: 116 }, { zone: 125, lat_from: 28, lat_to: 32, long_from: 112, long_to: 116 }, { zone: 126, lat_from: 24, lat_to: 28, long_from: 112, long_to: 116 }, { zone: 127, lat_from: 20, lat_to: 24, long_from: 112, long_to: 116 }, { zone: 128, lat_from: 16, lat_to: 20, long_from: 112, long_to: 116 }, { zone: 129, lat_from: 36, lat_to: 40, long_from: 116, long_to: 120 }, { zone: 130, lat_from: 32, lat_to: 36, long_from: 116, long_to: 120 }, { zone: 131, lat_from: 28, lat_to: 32, long_from: 116, long_to: 120 }, { zone: 132, lat_from: 24, lat_to: 28, long_from: 116, long_to: 120 }, { zone: 133, lat_from: 36, lat_to: 40, long_from: 120, long_to: 124 }, { zone: 134, lat_from: 32, lat_to: 36, long_from: 120, long_to: 124 }, { zone: 135, lat_from: 28, lat_to: 32, long_from: 120, long_to: 124 }];
+
+        const map = L.map('map', { zoomControl: false }).setView([29.864, 77.896], 11);
+        const gridLayer = L.layerGroup().addTo(map);
+        const drawnItems = new L.FeatureGroup().addTo(map);
+        let currentDrawControl = null;
+
+        const tileLayers = {
+            'carto-light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {subdomains: 'abcd', maxZoom: 20}).addTo(map),
+            'osm': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}),
+            'carto-dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {subdomains: 'abcd', maxZoom: 20})
+        };
+
+        function getIACData(lat, lng) {
+            const found = zones.find(z => lat >= z.lat_from && lat < z.lat_to && lng >= z.long_from && lng < z.long_to);
+            if (!found) return null;
+            const degLabels = [['A', 'E', 'I', 'M'], ['B', 'F', 'J', 'N'], ['C', 'G', 'K', 'O'], ['D', 'H', 'L', 'P']];
+            const topoLabels = [[1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15], [4, 8, 12, 16]];
+            const latRem = found.lat_to - lat;
+            const lngRem = lng - found.long_from;
+            const degS = degLabels[Math.floor(latRem)][Math.floor(lngRem)];
+            const latD = (lat % 1) * 60, lngD = (lng % 1) * 60;
+            const topS = topoLabels[3 - Math.floor(latD / 15)][Math.floor(lngD / 15)];
+            const latT = latD % 15, lngT = lngD % 15;
+            const quad = latT >= 7.5 ? (lngT < 7.5 ? "NW" : "NE") : (lngT < 7.5 ? "SW" : "SE");
+            return { million: found.zone, degree: degS, topo: topS, quad: quad };
+        }
+
+        // --- UPDATED: Hemisphere only (N/S) ---
+        function getUTMString(lat, lng) {
+            let zoneNum = Math.floor((lng + 180) / 6) + 1;
+            let hemi = (lat >= 0) ? "N" : "S";
+            return `${zoneNum}${hemi}`;
+        }
+
+        function updateMapGrid() {
+            gridLayer.clearLayers();
+            const zoom = map.getZoom();
+            const bounds = map.getBounds();
+            let interval = 4;
+            if (zoom >= 7) interval = 1;
+            if (zoom > 10) interval = 0.25;
+            if (zoom > 12) interval = 0.125;
+            const startLat = Math.floor(bounds.getSouth() / interval) * interval;
+            const endLat = Math.ceil(bounds.getNorth() / interval) * interval;
+            const startLng = Math.floor(bounds.getWest() / interval) * interval;
+            const endLng = Math.ceil(bounds.getEast() / interval) * interval;
+            for (let lat = startLat; lat < endLat; lat += interval) {
+                for (let lng = startLng; lng < endLng; lng += interval) {
+                    const data = getIACData(lat + interval/2, lng + interval/2);
+                    if (!data) continue;
+                    L.rectangle([[lat, lng], [lat + interval, lng + interval]], {
+                        color: "#999", weight: 0.8, fillOpacity: 0.03, interactive: false
+                    }).addTo(gridLayer);
+                    let txt = data.million;
+                    if (zoom >= 7) txt += " " + data.degree;
+                    if (zoom > 10) txt += "/" + data.topo;
+                    if (zoom > 12) txt += " " + data.quad;
+                    L.marker([lat + interval/2, lng + interval/2], {
+                        icon: L.divIcon({ className: 'grid-label', html: txt, iconSize: [55, 18] })
+                    }).addTo(gridLayer);
+                }
+            }
+        }
+
+        map.on('mousemove', (e) => {
+            const data = getIACData(e.latlng.lat, e.latlng.lng);
+            const utm = getUTMString(e.latlng.lat, e.latlng.lng);
+            document.getElementById('pos-val').innerText = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+            document.getElementById('utm-val').innerText = utm;
+            if(data) document.getElementById('sheet-val').innerText = `${data.million} ${data.degree}/${data.topo} ${data.quad}`;
+        });
+
+        let clickMarker = null;
+        map.on('click', (e) => {
+            const data = getIACData(e.latlng.lat, e.latlng.lng);
+            if (!data) return;
+            if (clickMarker) map.removeLayer(clickMarker);
+            clickMarker = L.marker(e.latlng).addTo(map)
+                .bindPopup(`<div class="iac-popup-header">${data.million} ${data.degree}/${data.topo} ${data.quad}</div>
+                            Coord: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}<br>
+                            UTM: ${getUTMString(e.latlng.lat, e.latlng.lng)}`).openPopup();
+        });
+
+        document.getElementById('search-btn').onclick = () => {
+            const q = document.getElementById('search').value;
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}`)
+                .then(r => r.json()).then(d => { if(d[0]) map.setView([d[0].lat, d[0].lon], 11); });
+        };
+
+        function activateTool(t) {
+            if (currentDrawControl) map.removeControl(currentDrawControl);
+            const opts = { edit: { featureGroup: drawnItems }, draw: { polygon: t==='polygon', rectangle: t==='rectangle', marker: t==='point', polyline:false, circle:false, circlemarker:false } };
+            currentDrawControl = new L.Control.Draw(opts);
+            map.addControl(currentDrawControl);
+        }
+        map.on('draw:created', (e) => drawnItems.addLayer(e.layer));
+        document.getElementById('clear-drawings').onclick = () => drawnItems.clearLayers();
+        document.getElementById('tile-selector').onchange = (e) => {
+            Object.values(tileLayers).forEach(l => map.removeLayer(l));
+            tileLayers[e.target.value].addTo(map);
+        };
+        map.on('moveend', updateMapGrid);
+        updateMapGrid();
+    </script>
+</body>
+</html>
