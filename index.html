@@ -28,7 +28,7 @@
             padding: 12px;
         }
 
-        /* Find Tool: Fixed at Bottom-Left */
+        /* Find Tool: Bottom-Left */
         .search-container { 
             bottom: 20px; 
             left: 20px; 
@@ -61,13 +61,12 @@
         }
         .btn-main:hover { background: #1a252f; }
 
-        /* Adjusted Font Size for Analysis Tools */
         .btn-tool {
             background: #fff;
             border: 1px solid #ddd;
             padding: 8px 4px;
             border-radius: 8px;
-            font-size: 0.7rem; /* Reduced for better visibility */
+            font-size: 0.7rem;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -78,6 +77,15 @@
         .btn-tool:hover { background: #fcfcfc; border-color: #bbb; }
         
         .draw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        /* Export Tool: Floating at Middle-Right */
+        .export-panel {
+            top: 250px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
         /* Real-time Status Bar: Bottom-Right */
         .status-bar {
@@ -93,7 +101,6 @@
         .status-bar b { color: var(--accent-orange); }
         .status-item { display: flex; justify-content: space-between; }
 
-        /* Map Labels */
         .grid-label {
             background: rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(0,0,0,0.15);
@@ -145,6 +152,12 @@
         </div>
     </div>
 
+    <div class="ui-panel export-panel">
+        <div class="section-title">Export Tools</div>
+        <button onclick="exportGeoJSON()" class="btn-tool">📄 Export JSON</button>
+        <button onclick="exportKML()" class="btn-tool">🗺️ Export KML</button>
+    </div>
+
     <div class="ui-panel status-bar">
         <div class="status-item">IAC Sheet: <b id="sheet-val">---</b></div>
         <div class="status-item">UTM Zone: <b id="utm-val">---</b></div>
@@ -156,6 +169,7 @@
     <script>
         const zones = [{ zone: 1, lat_from: 36, lat_to: 40, long_from: 44, long_to: 48 }, { zone: 2, lat_from: 32, lat_to: 36, long_from: 44, long_to: 48 }, { zone: 3, lat_from: 28, lat_to: 32, long_from: 44, long_to: 48 }, { zone: 4, lat_from: 24, lat_to: 28, long_from: 44, long_to: 48 }, { zone: 5, lat_from: 20, lat_to: 24, long_from: 44, long_to: 48 }, { zone: 6, lat_from: 16, lat_to: 20, long_from: 44, long_to: 48 }, { zone: 7, lat_from: 12, lat_to: 16, long_from: 44, long_to: 48 }, { zone: 8, lat_from: 36, lat_to: 40, long_from: 48, long_to: 52 }, { zone: 9, lat_from: 32, lat_to: 36, long_from: 48, long_to: 52 }, { zone: 10, lat_from: 28, lat_to: 32, long_from: 48, long_to: 52 }, { zone: 11, lat_from: 24, lat_to: 28, long_from: 48, long_to: 52 }, { zone: 12, lat_from: 20, lat_to: 24, long_from: 48, long_to: 52 }, { zone: 13, lat_from: 16, lat_to: 20, long_from: 48, long_to: 52 }, { zone: 14, lat_from: 12, lat_to: 16, long_from: 48, long_to: 52 }, { zone: 15, lat_from: 36, lat_to: 40, long_from: 52, long_to: 56 }, { zone: 16, lat_from: 32, lat_to: 36, long_from: 52, long_to: 56 }, { zone: 17, lat_from: 28, lat_to: 32, long_from: 52, long_to: 56 }, { zone: 18, lat_from: 24, lat_to: 28, long_from: 52, long_to: 56 }, { zone: 19, lat_from: 20, lat_to: 24, long_from: 52, long_to: 56 }, { zone: 20, lat_from: 16, lat_to: 20, long_from: 52, long_to: 56 }, { zone: 21, lat_from: 12, lat_to: 16, long_from: 52, long_to: 56 }, { zone: 22, lat_from: 36, lat_to: 40, long_from: 56, long_to: 60 }, { zone: 23, lat_from: 32, lat_to: 36, long_from: 56, long_to: 60 }, { zone: 24, lat_from: 28, lat_to: 32, long_from: 56, long_to: 60 }, { zone: 25, lat_from: 24, lat_to: 28, long_from: 56, long_to: 60 }, { zone: 26, lat_from: 20, lat_to: 24, long_from: 56, long_to: 60 }, { zone: 27, lat_from: 16, lat_to: 20, long_from: 56, long_to: 60 }, { zone: 28, lat_from: 36, lat_to: 40, long_from: 60, long_to: 64 }, { zone: 29, lat_from: 32, lat_to: 36, long_from: 60, long_to: 64 }, { zone: 30, lat_from: 28, lat_to: 32, long_from: 60, long_to: 64 }, { zone: 31, lat_from: 24, lat_to: 28, long_from: 60, long_to: 64 }, { zone: 32, lat_from: 36, lat_to: 40, long_from: 64, long_to: 68 }, { zone: 33, lat_from: 32, lat_to: 36, long_from: 64, long_to: 68 }, { zone: 34, lat_from: 28, lat_to: 32, long_from: 64, long_to: 68 }, { zone: 35, lat_from: 24, lat_to: 28, long_from: 64, long_to: 68 }, { zone: 36, lat_from: 20, lat_to: 24, long_from: 64, long_to: 68 }, { zone: 37, lat_from: 36, lat_to: 40, long_from: 68, long_to: 72 }, { zone: 38, lat_from: 32, lat_to: 36, long_from: 68, long_to: 72 }, { zone: 39, lat_from: 28, lat_to: 32, long_from: 68, long_to: 72 }, { zone: 40, lat_from: 24, lat_to: 28, long_from: 68, long_to: 72 }, { zone: 41, lat_from: 20, lat_to: 24, long_from: 68, long_to: 72 }, { zone: 42, lat_from: 36, lat_to: 40, long_from: 72, long_to: 76 }, { zone: 43, lat_from: 32, lat_to: 36, long_from: 72, long_to: 76 }, { zone: 44, lat_from: 28, lat_to: 32, long_from: 72, long_to: 76 }, { zone: 45, lat_from: 24, lat_to: 28, long_from: 72, long_to: 76 }, { zone: 46, lat_from: 20, lat_to: 24, long_from: 72, long_to: 76 }, { zone: 47, lat_from: 16, lat_to: 20, long_from: 72, long_to: 76 }, { zone: 48, lat_from: 12, lat_to: 16, long_from: 72, long_to: 76 }, { zone: 49, lat_from: 8, lat_to: 12, long_from: 72, long_to: 76 }, { zone: 50, lat_from: 4, lat_to: 8, long_from: 72, long_to: 76 }, { zone: 51, lat_from: 36, lat_to: 40, long_from: 76, long_to: 80 }, { zone: 52, lat_from: 32, lat_to: 36, long_from: 76, long_to: 80 }, { zone: 53, lat_from: 28, lat_to: 32, long_from: 76, long_to: 80 }, { zone: 54, lat_from: 24, lat_to: 28, long_from: 76, long_to: 80 }, { zone: 55, lat_from: 20, lat_to: 24, long_from: 76, long_to: 80 }, { zone: 56, lat_from: 16, lat_to: 20, long_from: 76, long_to: 80 }, { zone: 57, lat_from: 12, lat_to: 16, long_from: 76, long_to: 80 }, { zone: 58, lat_from: 8, lat_to: 12, long_from: 76, long_to: 80 }, { zone: 59, lat_from: 4, lat_to: 8, long_from: 76, long_to: 80 }, { zone: 60, lat_from: 36, lat_to: 40, long_from: 80, long_to: 84 }, { zone: 61, lat_from: 32, lat_to: 36, long_from: 80, long_to: 84 }, { zone: 62, lat_from: 28, lat_to: 32, long_from: 80, long_to: 84 }, { zone: 63, lat_from: 24, lat_to: 28, long_from: 80, long_to: 84 }, { zone: 64, lat_from: 20, lat_to: 24, long_from: 80, long_to: 84 }, { zone: 65, lat_from: 16, lat_to: 20, long_from: 80, long_to: 84 }, { zone: 66, lat_from: 12, lat_to: 16, long_from: 80, long_to: 84 }, { zone: 67, lat_from: 8, lat_to: 12, long_from: 80, long_to: 84 }, { zone: 68, lat_from: 4, lat_to: 8, long_from: 80, long_to: 84 }, { zone: 69, lat_from: 36, lat_to: 40, long_from: 84, long_to: 88 }, { zone: 70, lat_from: 32, lat_to: 36, long_from: 84, long_to: 88 }, { zone: 71, lat_from: 28, lat_to: 32, long_from: 84, long_to: 88 }, { zone: 72, lat_from: 24, lat_to: 28, long_from: 84, long_to: 88 }, { zone: 73, lat_from: 20, lat_to: 24, long_from: 84, long_to: 88 }, { zone: 74, lat_from: 16, lat_to: 20, long_from: 84, long_to: 88 }, { zone: 75, lat_from: 36, lat_to: 40, long_from: 88, long_to: 92 }, { zone: 76, lat_from: 32, lat_to: 36, long_from: 88, long_to: 92 }, { zone: 77, lat_from: 28, lat_to: 32, long_from: 88, long_to: 92 }, { zone: 78, lat_from: 24, lat_to: 28, long_from: 88, long_to: 92 }, { zone: 79, lat_from: 20, lat_to: 24, long_from: 88, long_to: 92 }, { zone: 80, lat_from: 36, lat_to: 40, long_from: 92, long_to: 96 }, { zone: 81, lat_from: 32, lat_to: 36, long_from: 92, long_to: 96 }, { zone: 82, lat_from: 28, lat_to: 32, long_from: 92, long_to: 96 }, { zone: 83, lat_from: 24, lat_to: 28, long_from: 92, long_to: 96 }, { zone: 84, lat_from: 20, lat_to: 24, long_from: 92, long_to: 96 }, { zone: 85, lat_from: 16, lat_to: 20, long_from: 92, long_to: 96 }, { zone: 86, lat_from: 12, lat_to: 16, long_from: 92, long_to: 96 }, { zone: 87, lat_from: 8, lat_to: 12, long_from: 92, long_to: 96 }, { zone: 88, lat_from: 4, lat_to: 8, long_from: 92, long_to: 96 }, { zone: 89, lat_from: 36, lat_to: 40, long_from: 96, long_to: 100 }, { zone: 90, lat_from: 32, lat_to: 36, long_from: 96, long_to: 100 }, { zone: 91, lat_from: 28, lat_to: 32, long_from: 96, long_to: 100 }, { zone: 92, lat_from: 24, lat_to: 28, long_from: 96, long_to: 100 }, { zone: 93, lat_from: 20, lat_to: 24, long_from: 96, long_to: 100 }, { zone: 94, lat_from: 16, lat_to: 20, long_from: 96, long_to: 100 }, { zone: 95, lat_from: 12, lat_to: 16, long_from: 96, long_to: 100 }, { zone: 96, lat_from: 8, lat_to: 12, long_from: 96, long_to: 100 }, { zone: 97, lat_from: 4, lat_to: 8, long_from: 96, long_to: 100 }, { zone: 98, lat_from: 36, lat_to: 40, long_from: 100, long_to: 104 }, { zone: 99, lat_from: 32, lat_to: 36, long_from: 100, long_to: 104 }, { zone: 100, lat_from: 28, lat_to: 32, long_from: 100, long_to: 104 }, { zone: 101, lat_from: 24, lat_to: 28, long_from: 100, long_to: 104 }, { zone: 102, lat_from: 20, lat_to: 24, long_from: 100, long_to: 104 }, { zone: 103, lat_from: 16, lat_to: 20, long_from: 100, long_to: 104 }, { zone: 104, lat_from: 12, lat_to: 16, long_from: 100, long_to: 104 }, { zone: 105, lat_from: 8, lat_to: 12, long_from: 100, long_to: 104 }, { zone: 106, lat_from: 4, lat_to: 8, long_from: 100, long_to: 104 }, { zone: 107, lat_from: 36, lat_to: 40, long_from: 104, long_to: 108 }, { zone: 108, lat_from: 32, lat_to: 36, long_from: 104, long_to: 108 }, { zone: 109, lat_from: 28, lat_to: 32, long_from: 104, long_to: 108 }, { zone: 110, lat_from: 24, lat_to: 28, long_from: 104, long_to: 108 }, { zone: 111, lat_from: 20, lat_to: 24, long_from: 104, long_to: 108 }, { zone: 112, lat_from: 16, lat_to: 20, long_from: 104, long_to: 108 }, { zone: 113, lat_from: 12, lat_to: 16, long_from: 104, long_to: 108 }, { zone: 114, lat_from: 8, lat_to: 12, long_from: 104, long_to: 108 }, { zone: 115, lat_from: 36, lat_to: 40, long_from: 108, long_to: 112 }, { zone: 116, lat_from: 32, lat_to: 36, long_from: 108, long_to: 112 }, { zone: 117, lat_from: 28, lat_to: 32, long_from: 108, long_to: 112 }, { zone: 118, lat_from: 24, lat_to: 28, long_from: 108, long_to: 112 }, { zone: 119, lat_from: 20, lat_to: 24, long_from: 108, long_to: 112 }, { zone: 120, lat_from: 16, lat_to: 20, long_from: 108, long_to: 112 }, { zone: 121, lat_from: 12, lat_to: 16, long_from: 108, long_to: 112 }, { zone: 122, lat_from: 8, lat_to: 12, long_from: 108, long_to: 112 }, { zone: 123, lat_from: 36, lat_to: 40, long_from: 112, long_to: 116 }, { zone: 124, lat_from: 32, lat_to: 36, long_from: 112, long_to: 116 }, { zone: 125, lat_from: 28, lat_to: 32, long_from: 112, long_to: 116 }, { zone: 126, lat_from: 24, lat_to: 28, long_from: 112, long_to: 116 }, { zone: 127, lat_from: 20, lat_to: 24, long_from: 112, long_to: 116 }, { zone: 128, lat_from: 16, lat_to: 20, long_from: 112, long_to: 116 }, { zone: 129, lat_from: 36, lat_to: 40, long_from: 116, long_to: 120 }, { zone: 130, lat_from: 32, lat_to: 36, long_from: 116, long_to: 120 }, { zone: 131, lat_from: 28, lat_to: 32, long_from: 116, long_to: 120 }, { zone: 132, lat_from: 24, lat_to: 28, long_from: 116, long_to: 120 }, { zone: 133, lat_from: 36, lat_to: 40, long_from: 120, long_to: 124 }, { zone: 134, lat_from: 32, lat_to: 36, long_from: 120, long_to: 124 }, { zone: 135, lat_from: 28, lat_to: 32, long_from: 120, long_to: 124 }];
 
+        // Initialize Map
         const map = L.map('map', { zoomControl: false }).setView([29.864, 77.896], 11);
         const gridLayer = L.layerGroup().addTo(map);
         const drawnItems = new L.FeatureGroup().addTo(map);
@@ -167,6 +181,7 @@
             'carto-dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {subdomains: 'abcd', maxZoom: 20})
         };
 
+        // Engine Logic
         function getIACData(lat, lng) {
             const found = zones.find(z => lat >= z.lat_from && lat < z.lat_to && lng >= z.long_from && lng < z.long_to);
             if (!found) return null;
@@ -182,7 +197,6 @@
             return { million: found.zone, degree: degS, topo: topS, quad: quad };
         }
 
-        // --- UPDATED: Hemisphere only (N/S) ---
         function getUTMString(lat, lng) {
             let zoneNum = Math.floor((lng + 180) / 6) + 1;
             let hemi = (lat >= 0) ? "N" : "S";
@@ -219,6 +233,52 @@
             }
         }
 
+        // --- EXPORT FUNCTIONALITY ---
+        function exportGeoJSON() {
+            const data = drawnItems.toGeoJSON();
+            if (data.features.length === 0) {
+                alert("Please draw something first!");
+                return;
+            }
+            const convertedData = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", convertedData);
+            downloadAnchorNode.setAttribute("download", "map_export.geojson");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function exportKML() {
+            const data = drawnItems.toGeoJSON();
+            if (data.features.length === 0) {
+                alert("Please draw something first!");
+                return;
+            }
+            // Basic KML Template Wrapper
+            let kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>';
+            data.features.forEach(feature => {
+                kml += '<Placemark>';
+                if (feature.geometry.type === 'Point') {
+                    kml += `<Point><coordinates>${feature.geometry.coordinates[0]},${feature.geometry.coordinates[1]}</coordinates></Point>`;
+                } else if (feature.geometry.type === 'Polygon') {
+                    let coords = feature.geometry.coordinates[0].map(c => `${c[0]},${c[1]}`).join(' ');
+                    kml += `<Polygon><outerBoundaryIs><LinearRing><coordinates>${coords}</coordinates></LinearRing></outerBoundaryIs></Polygon>`;
+                }
+                kml += '</Placemark>';
+            });
+            kml += '</Document></kml>';
+            
+            const convertedData = 'data:text/xml;charset=utf-8,' + encodeURIComponent(kml);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", convertedData);
+            downloadAnchorNode.setAttribute("download", "map_export.kml");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        // UI Listeners
         map.on('mousemove', (e) => {
             const data = getIACData(e.latlng.lat, e.latlng.lng);
             const utm = getUTMString(e.latlng.lat, e.latlng.lng);
